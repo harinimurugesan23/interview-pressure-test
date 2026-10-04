@@ -16,7 +16,7 @@ jobs:
             archive: tar.gz
             executable: tool-dev-interview-pressure-test
 
-          - os: macos-13
+          - os: macos-15-intel
             platform: darwin-x86_64
             archive: tar.gz
             executable: tool-dev-interview-pressure-test
