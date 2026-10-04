@@ -1,0 +1,9 @@
+{
+  "$schema": "anna-executa-identity/v1",
+  "host": "https://anna.partners",
+  "executa_id": 1168,
+  "tool_id": "tool-harini-tech-interview-pressure-test-qq6dhxqt",
+  "slug": "interview-pressure-test",
+  "executa_type": "tool",
+  "first_published_at": "2026-10-02T11:23:23.415Z"
+}

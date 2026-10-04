@@ -1,0 +1,2 @@
+[console_scripts]
+tool-dev-interview-pressure-test = interview_pressure_test_plugin:main

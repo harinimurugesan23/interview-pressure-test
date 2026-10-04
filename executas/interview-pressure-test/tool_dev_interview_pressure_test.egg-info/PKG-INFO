@@ -1,0 +1,5 @@
+Metadata-Version: 2.4
+Name: tool-dev-interview-pressure-test
+Version: 0.1.0
+Summary: Executa for the interview-pressure-test Anna App
+Requires-Python: >=3.10

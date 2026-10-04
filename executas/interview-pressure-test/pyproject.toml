@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tool-dev-interview-pressure-test"
+version = "0.1.0"
+description = "Executa for the interview-pressure-test Anna App"
+requires-python = ">=3.10"
+
+[project.scripts]
+"tool-dev-interview-pressure-test" = "interview_pressure_test_plugin:main"
+
+[tool.setuptools]
+py-modules = ["interview_pressure_test_plugin"]

@@ -1,0 +1,11 @@
+{
+  "$schema": "anna-executas-lock/v1",
+  "host": "https://anna.partners",
+  "executas": {
+    "interview-pressure-test": {
+      "tool_id": "tool-harini-tech-interview-pressure-test-qq6dhxqt",
+      "path": "executas/interview-pressure-test",
+      "source": "cut"
+    }
+  }
+}

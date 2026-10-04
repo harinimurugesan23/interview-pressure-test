@@ -1,0 +1,90 @@
+name: Build Interview Pressure Test Executa
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            platform: darwin-arm64
+            archive: tar.gz
+            executable: tool-dev-interview-pressure-test
+
+          - os: macos-13
+            platform: darwin-x86_64
+            archive: tar.gz
+            executable: tool-dev-interview-pressure-test
+
+          - os: ubuntu-latest
+            platform: linux-x86_64
+            archive: tar.gz
+            executable: tool-dev-interview-pressure-test
+
+          - os: windows-latest
+            platform: windows-x86_64
+            archive: zip
+            executable: tool-dev-interview-pressure-test.exe
+
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        working-directory: executas/interview-pressure-test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install project
+        run: uv sync
+
+      - name: Install PyInstaller
+        run: uv pip install pyinstaller
+
+      - name: Build executable
+        run: >
+          uv run pyinstaller
+          --onefile
+          --clean
+          --noconfirm
+          --name "${{ matrix.executable }}"
+          interview_pressure_test_plugin.py
+
+      - name: Package Unix binary
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: |
+          mkdir -p package
+          cp "dist/${{ matrix.executable }}" "package/${{ matrix.executable }}"
+          tar -czf \
+            "dist/tool-dev-interview-pressure-test-0.1.0-${{ matrix.platform }}.tar.gz" \
+            -C package \
+            "${{ matrix.executable }}"
+
+      - name: Package Windows binary
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path package
+          Copy-Item "dist/${{ matrix.executable }}" "package/${{ matrix.executable }}"
+          Compress-Archive `
+            -Path "package/${{ matrix.executable }}" `
+            -DestinationPath "dist/tool-dev-interview-pressure-test-0.1.0-${{ matrix.platform }}.zip"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: interview-pressure-test-${{ matrix.platform }}
+          path: executas/interview-pressure-test/dist/tool-dev-interview-pressure-test-0.1.0-${{ matrix.platform }}.*

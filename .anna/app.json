@@ -1,0 +1,8 @@
+{
+  "$schema": "anna-app-identity/v1",
+  "host": "https://anna.partners",
+  "app_id": 394,
+  "slug": "interview-pressure-test",
+  "handle": "harini-tech",
+  "first_published_at": "2026-10-02T11:16:00.923Z"
+}

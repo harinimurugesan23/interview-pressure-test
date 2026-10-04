@@ -1,0 +1,12 @@
+{
+  "name": "interview-pressure-test",
+  "slug": "interview-pressure-test",
+  "tagline": "Don't just practice interviews. Survive them.",
+  "description": "AI-powered mock interviews tailored to your resume and job description, with adaptive questions and instant feedback.",
+  "category": "education",
+  "bundled_executas": {
+    "interview-pressure-test": {
+      "path": "executas/interview-pressure-test"
+    }
+  }
+}
