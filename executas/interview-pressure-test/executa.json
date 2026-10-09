@@ -1,7 +1,7 @@
 {
   "slug": "interview-pressure-test",
   "name": "Interview Pressure Test",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "executa_type": "tool",
   "description": "AI-powered adaptive interview question generator for personalized mock interviews.",
   "tool_id": "interview-pressure-test",

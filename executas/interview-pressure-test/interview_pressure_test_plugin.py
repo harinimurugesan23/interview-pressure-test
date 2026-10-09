@@ -5,7 +5,7 @@ import sys
 
 MANIFEST = {
     "name": "tool-dev-interview-pressure-test",
-    "version": "0.1.0",
+    "version": "0.1.3",
     "tools": [
         {
             "name": "ping",
