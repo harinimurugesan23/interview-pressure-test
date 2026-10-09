@@ -1,14 +1,16 @@
+
 name: Build Interview Pressure Test Executa
 
 on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: macos-14
@@ -47,7 +49,24 @@ jobs:
       - name: Set up Python
         run: uv python install 3.12
 
-      - name: Install project
+      - name: Read Executa metadata
+        id: meta
+        shell: python
+        run: |
+          import json
+          import os
+
+          with open("executa.json", encoding="utf-8") as f:
+              data = json.load(f)
+
+          version = data["version"]
+          if not version:
+              raise SystemExit("Missing Executa version")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+              f.write(f"version={version}\n")
+
+      - name: Install project dependencies
         run: uv sync
 
       - name: Install PyInstaller
@@ -65,26 +84,164 @@ jobs:
       - name: Package Unix binary
         if: matrix.archive == 'tar.gz'
         shell: bash
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          EXECUTABLE: ${{ matrix.executable }}
+          PLATFORM: ${{ matrix.platform }}
         run: |
+          set -euo pipefail
+
+          rm -rf package
           mkdir -p package
-          cp "dist/${{ matrix.executable }}" "package/${{ matrix.executable }}"
+
+          cp "dist/$EXECUTABLE" "package/$EXECUTABLE"
+          chmod 755 "package/$EXECUTABLE"
+
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          executable = os.environ["EXECUTABLE"]
+          version = os.environ["VERSION"]
+
+          manifest = {
+              "name": "tool-dev-interview-pressure-test",
+              "display_name": "Interview Pressure Test",
+              "version": version,
+              "description": "AI-powered adaptive interview question generator for personalized mock interviews.",
+              "runtime": {
+                  "binary": {
+                      "entrypoint": {
+                          "default": executable
+                      },
+                      "permissions": {
+                          executable: "0o755"
+                      }
+                  }
+              }
+          }
+
+          Path("package/manifest.json").write_text(
+              json.dumps(manifest, indent=2) + "\n",
+              encoding="utf-8"
+          )
+          PY
+
           tar -czf \
-            "dist/tool-dev-interview-pressure-test-0.1.0-${{ matrix.platform }}.tar.gz" \
-            -C package \
-            "${{ matrix.executable }}"
+            "dist/tool-dev-interview-pressure-test-${VERSION}-${PLATFORM}.tar.gz" \
+            -C package "$EXECUTABLE" manifest.json
 
       - name: Package Windows binary
         if: matrix.archive == 'zip'
         shell: pwsh
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          EXECUTABLE: ${{ matrix.executable }}
+          PLATFORM: ${{ matrix.platform }}
         run: |
-          New-Item -ItemType Directory -Force -Path package
-          Copy-Item "dist/${{ matrix.executable }}" "package/${{ matrix.executable }}"
+          $ErrorActionPreference = "Stop"
+
+          Remove-Item package -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path package | Out-Null
+
+          Copy-Item "dist/$env:EXECUTABLE" "package/$env:EXECUTABLE"
+
+          $permissions = @{}
+          $permissions[$env:EXECUTABLE] = "0o755"
+
+          $manifest = @{
+            name = "tool-dev-interview-pressure-test"
+            display_name = "Interview Pressure Test"
+            version = $env:VERSION
+            description = "AI-powered adaptive interview question generator for personalized mock interviews."
+            runtime = @{
+              binary = @{
+                entrypoint = @{
+                  default = $env:EXECUTABLE
+                }
+                permissions = $permissions
+              }
+            }
+          }
+
+          $manifest |
+            ConvertTo-Json -Depth 10 |
+            Set-Content -Path package/manifest.json -Encoding utf8
+
           Compress-Archive `
-            -Path "package/${{ matrix.executable }}" `
-            -DestinationPath "dist/tool-dev-interview-pressure-test-0.1.0-${{ matrix.platform }}.zip"
+            -Path "package/$env:EXECUTABLE", "package/manifest.json" `
+            -DestinationPath "dist/tool-dev-interview-pressure-test-$env:VERSION-$env:PLATFORM.zip" `
+            -Force
+
+      - name: Verify archive
+        shell: python
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          EXECUTABLE: ${{ matrix.executable }}
+          PLATFORM: ${{ matrix.platform }}
+          ARCHIVE_FORMAT: ${{ matrix.archive }}
+        run: |
+          import json
+          import os
+          import tarfile
+          import zipfile
+          from pathlib import Path
+
+          version = os.environ["VERSION"]
+          executable = os.environ["EXECUTABLE"]
+          platform = os.environ["PLATFORM"]
+          archive_format = os.environ["ARCHIVE_FORMAT"]
+
+          suffix = ".tar.gz" if archive_format == "tar.gz" else ".zip"
+          archive = Path(
+              f"dist/tool-dev-interview-pressure-test-{version}-{platform}{suffix}"
+          )
+
+          if not archive.is_file() or archive.stat().st_size == 0:
+              raise SystemExit(f"Archive missing or empty: {archive}")
+
+          if archive_format == "tar.gz":
+              with tarfile.open(archive, "r:gz") as tf:
+                  names = {Path(member.name).name for member in tf.getmembers()}
+                  if executable not in names or "manifest.json" not in names:
+                      raise SystemExit("Archive missing executable or manifest")
+
+                  manifest_member = next(
+                      member for member in tf.getmembers()
+                      if Path(member.name).name == "manifest.json"
+                  )
+                  file_obj = tf.extractfile(manifest_member)
+                  if file_obj is None:
+                      raise SystemExit("Could not read manifest.json")
+                  manifest = json.load(file_obj)
+          else:
+              with zipfile.ZipFile(archive) as zf:
+                  names = {Path(name).name for name in zf.namelist()}
+                  if executable not in names or "manifest.json" not in names:
+                      raise SystemExit("Archive missing executable or manifest")
+
+                  # Compress-Archive stores both files at the archive root.
+                  manifest = json.loads(zf.read("manifest.json"))
+
+          entrypoint = manifest["runtime"]["binary"]["entrypoint"]["default"]
+
+          if entrypoint != executable:
+              raise SystemExit(
+                  f"Entrypoint mismatch: expected {executable}, got {entrypoint}"
+              )
+
+          if manifest["version"] != version:
+              raise SystemExit("Manifest version does not match Executa version")
+
+          print(f"Verified: {archive}")
+          print(f"Size: {archive.stat().st_size} bytes")
+          print(f"Entrypoint: {entrypoint}")
+          print(f"Version: {manifest['version']}")
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: interview-pressure-test-${{ matrix.platform }}
-          path: executas/interview-pressure-test/dist/tool-dev-interview-pressure-test-0.1.0-${{ matrix.platform }}.*
+          path: executas/interview-pressure-test/dist/tool-dev-interview-pressure-test-${{ steps.meta.outputs.version }}-${{ matrix.platform }}.*
+          if-no-files-found: error
